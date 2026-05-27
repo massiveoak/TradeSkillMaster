@@ -16,6 +16,70 @@ local private = {}
 private.gather = {}
 private.shown = {}
 
+local function GetAscensionBankType()
+	local detectedPersonal = nil
+	local detectedRealm = nil
+
+	if HasJsonCacheData and HasJsonCacheData("BANK_PERMISSIONS_PAYLOAD", 0) then
+		local json = GetJsonCacheData("BANK_PERMISSIONS_PAYLOAD", 0)
+		if json and C_Serialize and C_Serialize.FromJSON then
+			local ok, jsonObject = pcall(function() return C_Serialize:FromJSON(json) end)
+			if ok and jsonObject then
+				detectedPersonal = jsonObject.IsPersonalBank
+				detectedRealm = jsonObject.IsRealmBank
+			end
+		end
+	end
+
+	if not detectedPersonal and not detectedRealm then
+		local numTabs = GetNumGuildBankTabs and GetNumGuildBankTabs() or 0
+		local firstTabName = numTabs > 0 and GetGuildBankTabInfo(1) or nil
+		detectedPersonal = (firstTabName == "Personal Bank")
+		detectedRealm = (firstTabName == "Realm Bank")
+	end
+
+	if detectedPersonal then
+		return "personal"
+	elseif detectedRealm then
+		return "realm"
+	end
+end
+
+local function SourceTaskExists(sources, sourceName, taskType)
+	for _, source in ipairs(sources) do
+		if source.sourceName == sourceName then
+			for _, task in ipairs(source.tasks) do
+				if task.taskType == taskType then
+					return true
+				end
+			end
+		end
+	end
+end
+
+local function CurrentSourceTaskExists(sources)
+	return private.currentSource and private.currentTask and SourceTaskExists(sources, private.currentSource, private.currentTask)
+end
+
+local function SelectOpenBankSource(sources)
+	if CurrentSourceTaskExists(sources) then return end
+
+	local bankType = GetAscensionBankType()
+	if bankType == "personal" and SourceTaskExists(sources, UnitName("player"), L["Visit Personal Bank"]) then
+		private.currentSource = UnitName("player")
+		private.currentTask = L["Visit Personal Bank"]
+	elseif bankType == "realm" and SourceTaskExists(sources, L["Realm Bank"], L["Visit Realm Bank"]) then
+		private.currentSource = L["Realm Bank"]
+		private.currentTask = L["Visit Realm Bank"]
+	elseif GuildBankFrame and GuildBankFrame:IsVisible() and SourceTaskExists(sources, UnitName("player"), L["Visit Guild Bank"]) then
+		private.currentSource = UnitName("player")
+		private.currentTask = L["Visit Guild Bank"]
+	elseif BankFrame and BankFrame:IsVisible() and SourceTaskExists(sources, UnitName("player"), L["Visit Bank"]) then
+		private.currentSource = UnitName("player")
+		private.currentTask = L["Visit Bank"]
+	end
+end
+
 -- list of profession skills that do not have crafting. used by UpdateTradeSkills
 local invalidTrade = {
 	["Herbalism"] = true,
@@ -2484,6 +2548,7 @@ function GUI:UpdateGathering()
 
 	-- update sources
 	local sources = TSM.Inventory:GetItemSources(crafter, neededMats) or {}
+	SelectOpenBankSource(sources)
 	stData = {}
 	if next(sources) then
 		for _, source in ipairs(sources) do
@@ -2650,14 +2715,12 @@ end
 function GUI:GatheringEventHandler(event)
 	if not GUI.gatheringFrame or not GUI.gatheringFrame:IsShown() then return end
 
-	if event == "GUILDBANKFRAME_OPENED" then
-		-- Ascension WoW: Detect bank type based on first tab name
-		local numTabs = GetNumGuildBankTabs()
-		local firstTabName = numTabs > 0 and GetGuildBankTabInfo(1) or nil
-		if firstTabName == "Personal Bank" then
+	if event == "GUILDBANKFRAME_OPENED" or event == "GUILDBANKBAGSLOTS_CHANGED" then
+		local bankType = GetAscensionBankType()
+		if bankType == "personal" then
 			private.currentSource = UnitName("player")
 			private.currentTask = L["Visit Personal Bank"]
-		elseif firstTabName == "Realm Bank" then
+		elseif bankType == "realm" then
 			private.currentSource = L["Realm Bank"]
 			private.currentTask = L["Visit Realm Bank"]
 		else

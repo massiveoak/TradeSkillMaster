@@ -201,7 +201,7 @@ local function getContainerTable(cnt)
 	elseif cnt == "guildbank" then
 		for i = 1, GetNumGuildBankTabs() do
 			local canView, canDeposit, stacksPerDay = GetGuildBankTabInfo(i);
-			if canView and canDeposit and stacksPerDay then
+			if ascensionBankType or (canView and canDeposit and stacksPerDay) then
 				t[i] = i
 			end
 		end
@@ -290,6 +290,42 @@ local function findExistingStack(itemLink, dest, quantity, gbank)
 	end
 end
 
+local function findExistingStackInBag(itemLink, bag, quantity)
+	if not bag then return end
+	for slot = 1, TSM.getContainerNumSlotsDest(bag) do
+		if TSM.getContainerItemIDDest(bag, slot) == TSMAPI:GetBaseItemString(itemLink, true) then
+			local maxStack = select(8, TSMAPI:GetSafeItemInfo(itemLink))
+			local _, currentQuantity = TSM.getContainerItemIDDest(bag, slot)
+			if currentQuantity and (currentQuantity + quantity) <= maxStack then
+				return bag, slot
+			end
+		end
+	end
+end
+
+local function getGuildBankDestinationTab(itemLink, quantity)
+	local currentTab = GetCurrentGuildBankTab()
+	if currentTab then
+		local destTab, destSlot = findExistingStackInBag(itemLink, currentTab, quantity)
+		if destTab then
+			return destTab, destSlot
+		elseif GetEmptySlotCount(currentTab) ~= false then
+			return currentTab
+		end
+	end
+
+	local destTab, destSlot = findExistingStack(itemLink, "guildbank", quantity, true)
+	if destTab then
+		return destTab, destSlot
+	end
+
+	for _, tab in ipairs(getContainerTable("guildbank")) do
+		if GetEmptySlotCount(tab) ~= false then
+			return tab
+		end
+	end
+end
+
 local function getTotalItems(src)
 	local results = {}
 	if src == "bank" then
@@ -362,15 +398,7 @@ function TSM.generateMoves(includeSoulbound)
 							if have and need then
 								local destBag
 								if bankType == "guildbank" then
-									destBag = findExistingStack(itemLink, bankType, min(have, need), true)
-									if not destBag then
-										for _, tab in ipairs(getContainerTable(bankType)) do
-											if GetEmptySlotCount(tab) ~= false then
-												destBag = tab
-												break
-											end
-										end
-									end
+									destBag = getGuildBankDestinationTab(itemLink, min(have, need))
 								else
 									destBag = findExistingStack(itemLink, bankType, min(have, need))
 									if not destBag then
@@ -414,7 +442,7 @@ function TSM.generateMoves(includeSoulbound)
 						local have = TSM.getContainerItemQty(bag, slot)
 						local need = bankMoves[itemString]
 						if have and need then
-							if not TSMAPI:IsSoulbound(bag, slot) or includeSoulbound then
+							if bankType == "guildbank" or not TSMAPI:IsSoulbound(bag, slot) or includeSoulbound then
 								local destBag = findExistingStack(itemLink, "bags", min(have, need)) or canGoInBag(itemString, getContainerTable("bags"))
 								if destBag then
 									if have > need then
@@ -518,42 +546,20 @@ function TSM.moveItem()
 			local need = fullMoves[i].quantity
 			if have and need then
 				if bankType == "guildbank" then
-					local destTab, destSlot = findExistingStack(itemLink, bankType, need, true)
+					local destTab, destSlot = getGuildBankDestinationTab(itemLink, need)
 					if destTab then
 						if GetCurrentGuildBankTab() ~= destTab then
 							SetCurrentGuildBankTab(destTab)
 						end
-						TSM.autoStoreItem(fullMoves[i].bag, fullMoves[i].slot)
-					else
-						destTab = nil
-						for _, tab in ipairs(getContainerTable(bankType)) do
-							if GetEmptySlotCount(tab) ~= false then
-								destTab = tab
-								break
-							end
-						end
-						if destTab then
-							if GetCurrentGuildBankTab() ~= destTab then
-								SetCurrentGuildBankTab(destTab)
-							end
-							destSlot = nil
-							for s = 1, TSM.getContainerNumSlotsDest(destTab) do
-								if not TSM.getContainerItemLinkDest(destTab, s) then
-									destSlot = s
-									break
-								end
-							end
-							if destSlot then
-								TSM.pickupContainerItemSrc(fullMoves[i].bag, fullMoves[i].slot)
-								TSM.pickupContainerItemDest(destTab, destSlot)
-							else
-								TSMAPI:CancelFrame("moveItem")
-								TSMAPI:CreateTimeDelay("generateMoves", 0.4, TSM.generateMoves)
-							end
+						if destSlot then
+							TSM.pickupContainerItemSrc(fullMoves[i].bag, fullMoves[i].slot)
+							TSM.pickupContainerItemDest(destTab, destSlot)
 						else
-							TSMAPI:CancelFrame("moveItem")
-							TSMAPI:CreateTimeDelay("generateMoves", 0.4, TSM.generateMoves)
+							TSM.autoStoreItem(fullMoves[i].bag, fullMoves[i].slot)
 						end
+					else
+						TSMAPI:CancelFrame("moveItem")
+						TSMAPI:CreateTimeDelay("generateMoves", 0.4, TSM.generateMoves)
 					end
 				else
 					if findExistingStack(itemLink, bankType, need) then
