@@ -249,6 +249,7 @@ function GUI:EventHandler(event, ...)
 	local unittest = ...
 	if unittest == "player" or unittest==nil then --Changing tradeskill frames and stuff has "nil" unit, when other players cast this also triggers with nil
 		if event == "TRADE_SKILL_CLOSE" then
+			GUI:StopAutoCraftQueue()
 			GUI.frame:Hide()
 		elseif event == "TRADE_SKILL_UPDATE" or event == "TRADE_SKILL_FILTER_UPDATE" then
 			if GetTradeSkillLine() ~= GUI.currentTradeSkill or select(2, IsTradeSkillLinked()) ~= GUI.currentLinkedPlayer then
@@ -297,7 +298,10 @@ function GUI:EventHandler(event, ...)
 			if GUI.isCrafting and GUI.isCrafting.quantity > 0 then
 				GUI.isCrafting.quantity = GUI.isCrafting.quantity - 1
 				if GUI.isCrafting.quantity == 0 then
-					--GUI:UpdateQueue()
+					TSMAPI:CreateTimeDelay("craftingQueueUpdateThrottle", 0.2, GUI.UpdateQueue)
+					if private.autoCraftQueue then
+						TSMAPI:CreateTimeDelay("craftingAutoCraftNextThrottle", 0.4, GUI.CraftNextFromQueue)
+					end
 				end
 			end
 			-- no longer casting a spell so discard spellID
@@ -313,6 +317,7 @@ function GUI:EventHandler(event, ...)
 
 			if GUI.isCrafting and TSM.currentspell == GUI.isCrafting.spellID then
 				GUI.isCrafting.quantity = 0
+				GUI:StopAutoCraftQueue()
 				TSMAPI:CreateTimeDelay("craftingQueueUpdateThrottle", 0.2, GUI.UpdateQueue)
 			end
 			-- no longer casting a spell so discard spellID
@@ -477,6 +482,33 @@ function GUI:CastTradeSkill(index, quantity, vellum)
 	end
 end
 
+function GUI:StopAutoCraftQueue()
+	private.autoCraftQueue = nil
+	if GUI.frame and GUI.frame.queue and GUI.frame.queue.autoCraftBtn then
+		GUI.frame.queue.autoCraftBtn:SetText("Craft All")
+	end
+end
+
+function GUI:CraftNextFromQueue()
+	if not private.autoCraftQueue then return end
+	if not GUI.frame or not GUI.frame.queue or not GUI.frame.queue:IsVisible() then
+		return GUI:StopAutoCraftQueue()
+	end
+	if UnitCastingInfo("player") or (GUI.isCrafting and GUI.isCrafting.quantity > 0) then
+		return TSMAPI:CreateTimeDelay("craftingAutoCraftNextThrottle", 0.2, GUI.CraftNextFromQueue)
+	end
+
+	GUI:UpdateQueue()
+	if not GUI.craftNextInfo then
+		return GUI:StopAutoCraftQueue()
+	end
+
+	GUI:CastTradeSkill(GUI.craftNextInfo.index, GUI.craftNextInfo.quantity, GUI.craftNextInfo.velName)
+	if GUI.frame.queue.craftNextbtn then
+		GUI.frame.queue.craftNextbtn:Disable()
+	end
+end
+
 
 function GUI:ShowSwitchButton()
 	if not GUI.switchBtn then
@@ -531,7 +563,7 @@ function GUI:CreateGUI()
 	frame:SetMinResize(450, 400)
 	TSMAPI.Design:SetFrameBackdropColor(frame)
 	frame:Show()
-	frame:SetScript("OnHide", function() if not GUI.noClose then GUI.switchBtn:Hide() TradeSkillFrame:Show() CloseTradeSkill() end end)
+	frame:SetScript("OnHide", function() GUI:StopAutoCraftQueue() if not GUI.noClose then GUI.switchBtn:Hide() TradeSkillFrame:Show() CloseTradeSkill() end end)
 	tinsert(UISpecialFrames, "TSMCraftingTradeSkillFrame")
 	GUI.frame = frame
 
@@ -812,7 +844,7 @@ function GUI:CreateQueueFrame(parent)
 
 	local btn = TSMAPI.GUI:CreateButton(frame, 14)
 	btn:SetPoint("BOTTOMLEFT", 5, 5)
-	btn:SetWidth(120)
+	btn:SetWidth(85)
 	btn:SetHeight(20)
 	btn:SetText(L["Clear Queue"])
 	btn:SetScript("OnClick", function()
@@ -823,6 +855,7 @@ function GUI:CreateQueueFrame(parent)
 			timeout = 0,
 			hideOnEscape = true,
 			OnAccept = function()
+				GUI:StopAutoCraftQueue()
 				TSM.Queue:ClearQueue()
 				GUI:UpdateQueue()
 				if GUI.frame.gather:IsVisible() then
@@ -846,7 +879,7 @@ function GUI:CreateQueueFrame(parent)
 
 	local btn = TSMAPI.GUI:CreateButton(frame, 18, "TSMCraftNextButton")
 	btn:SetPoint("BOTTOMLEFT", frame.clearBtn, "BOTTOMRIGHT", 5, 0)
-	btn:SetPoint("BOTTOMRIGHT", -5, 5)
+	btn:SetWidth(85)
 	btn:SetHeight(20)
 	btn:SetText(L["Craft Next"])
 	-- btn:SetScript("OnUpdate", function(self)
@@ -864,6 +897,22 @@ function GUI:CreateQueueFrame(parent)
 		self:Disable()
 	end)
 	frame.craftNextbtn = btn
+
+	local btn = TSMAPI.GUI:CreateButton(frame, 18, "TSMCraftAllButton")
+	btn:SetPoint("BOTTOMLEFT", frame.craftNextbtn, "BOTTOMRIGHT", 5, 0)
+	btn:SetPoint("BOTTOMRIGHT", -5, 5)
+	btn:SetHeight(20)
+	btn:SetText("Craft All")
+	btn:SetScript("OnClick", function(self)
+		if private.autoCraftQueue then
+			GUI:StopAutoCraftQueue()
+		else
+			private.autoCraftQueue = true
+			self:SetText("Stop")
+			GUI:CraftNextFromQueue()
+		end
+	end)
+	frame.autoCraftBtn = btn
 
 	return frame
 end
@@ -1987,6 +2036,18 @@ function GUI:UpdateCraftButton()
 		TSMCraftNextButton:Disable()
 	else
 		TSMCraftNextButton:Enable()
+	end
+	if TSMCraftAllButton then
+		if private.autoCraftQueue then
+			TSMCraftAllButton:SetText("Stop")
+			TSMCraftAllButton:Enable()
+		elseif GUI.craftNextInfo then
+			TSMCraftAllButton:SetText("Craft All")
+			TSMCraftAllButton:Enable()
+		else
+			TSMCraftAllButton:SetText("Craft All")
+			TSMCraftAllButton:Disable()
+		end
 	end
 end
 
