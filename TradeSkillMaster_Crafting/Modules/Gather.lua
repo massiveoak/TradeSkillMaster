@@ -181,6 +181,7 @@ end
 
 local function ShoppingCallback(remainingQty, boughtItem, stackSize)
 	local currentItem = private.shoppingItems[1]
+	local quantityUpdates
 	if not boughtItem then
 		if next(private.shoppingItems) then
 			local name = TSMAPI:GetSafeItemInfo(private.shoppingItems[1].itemString)
@@ -195,6 +196,13 @@ local function ShoppingCallback(remainingQty, boughtItem, stackSize)
 		if currentItem and boughtItem == currentItem.rawItemString then
 			remainingQty = ceil((remainingQty or 0) / currentItem.rawPerBolt)
 		end
+		if currentItem and currentItem.rawItemString and currentItem.rawPerBolt and (boughtItem == currentItem.itemString or boughtItem == currentItem.rawItemString) then
+			currentItem.quantity = max(remainingQty or 0, 0)
+			quantityUpdates = {
+				[currentItem.itemString] = currentItem.quantity,
+				[currentItem.rawItemString] = currentItem.quantity * currentItem.rawPerBolt,
+			}
+		end
 		TSM.Inventory.gatherQuantity = remainingQty
 		if TSM.Inventory.gatherItem and boughtItem ~= TSM.Inventory.gatherItem then
 			for itemString, data in pairs(TSMAPI.Conversions[TSM.Inventory.gatherItem] or {}) do
@@ -208,6 +216,7 @@ local function ShoppingCallback(remainingQty, boughtItem, stackSize)
 			TSMAPI:CreateTimeDelay("shoppingSearchThrottle", 0.5, ShoppingNextSearch)
 		end
 	end
+	return quantityUpdates
 end
 
 function Gather:ShoppingSearch(itemString, need, ignoreMaxQty)

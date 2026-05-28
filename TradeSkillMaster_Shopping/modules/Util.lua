@@ -456,7 +456,14 @@ function private:RemoveAuction(auction, event, itemString)
 					if event == "OnBuyout" and query then
 						if private.mode == "normal" and (query.maxQuantity or 0) > 0 then
 							query.maxQuantity = query.maxQuantity - auction.count
-							if TSM.moduleAPICallback then TSM.moduleAPICallback(max(query.maxQuantity, 0), itemString, auction.count) end
+							local quantityUpdates = TSM.moduleAPICallback and TSM.moduleAPICallback(max(query.maxQuantity, 0), itemString, auction.count)
+							if type(quantityUpdates) == "table" then
+								for updateItemString, maxQuantity in pairs(quantityUpdates) do
+									if private.auctions[updateItemString] and private.auctions[updateItemString].query then
+										private.auctions[updateItemString].query.maxQuantity = maxQuantity
+									end
+								end
+							end
 							for item, auctionItem in pairs(private.auctions) do
 								if auctionItem.query and auctionItem.query.maxQuantity and auctionItem.query.maxQuantity <= 0 then
 									private.auctions[item] = nil
