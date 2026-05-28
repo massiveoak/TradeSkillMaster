@@ -300,7 +300,7 @@ function GUI:EventHandler(event, ...)
 				if GUI.isCrafting.quantity == 0 then
 					TSMAPI:CreateTimeDelay("craftingQueueUpdateThrottle", 0.2, GUI.UpdateQueue)
 					if private.autoCraftQueue then
-						GUI:StopAutoCraftQueue()
+						TSMAPI:CreateTimeDelay("craftingAutoCraftNextThrottle", 0.4, GUI.CraftNextFromQueue)
 					end
 				end
 			end
@@ -493,6 +493,9 @@ function GUI:CraftNextFromQueue()
 	if not private.autoCraftQueue then return end
 	if not GUI.frame or not GUI.frame.queue or not GUI.frame.queue:IsVisible() then
 		return GUI:StopAutoCraftQueue()
+	end
+	if UnitCastingInfo("player") or (GUI.isCrafting and GUI.isCrafting.quantity > 0) then
+		return TSMAPI:CreateTimeDelay("craftingAutoCraftNextThrottle", 0.2, GUI.CraftNextFromQueue)
 	end
 
 	GUI:UpdateQueue()
