@@ -12,6 +12,36 @@ local L = LibStub("AceLocale-3.0"):GetLocale("TradeSkillMaster_Mailing") -- load
 
 local private = { recheckTime = 1, allowTimerStart = true, lootIndex = 1, freeSlots = true }
 
+function private:GetMailKey(index)
+	local _, _, sender, subject, money, cod, daysLeft, hasItem = GetInboxHeaderInfo(index)
+	local itemLink = GetInboxItemLink(index, 1)
+	local quantity = itemLink and select(3, GetInboxItem(index, 1)) or 0
+	return strjoin(":", tostring(sender), tostring(subject), tostring(money), tostring(cod), tostring(daysLeft), tostring(hasItem), tostring(itemLink), tostring(quantity))
+end
+
+function private:IsPendingLootMail(index)
+	if not private.pendingLootKey then return end
+	local numMail, totalMail = GetInboxNumItems()
+	if numMail ~= private.pendingLootNumMail or totalMail ~= private.pendingLootTotalMail then
+		private:ClearPendingLootMail()
+		return
+	end
+	return index == private.pendingLootIndex and private:GetMailKey(index) == private.pendingLootKey
+end
+
+function private:SetPendingLootMail(index)
+	private.pendingLootKey = private:GetMailKey(index)
+	private.pendingLootIndex = index
+	private.pendingLootNumMail, private.pendingLootTotalMail = GetInboxNumItems()
+end
+
+function private:ClearPendingLootMail()
+	private.pendingLootKey = nil
+	private.pendingLootIndex = nil
+	private.pendingLootNumMail = nil
+	private.pendingLootTotalMail = nil
+end
+
 
 function Inbox:OnEnable()
 	Inbox:RegisterEvent("MAIL_SHOW")
@@ -410,6 +440,7 @@ end
 -- Deals with auto looting of mail!
 function private:StartAutoLooting(mode)
 	private.mode = mode
+	private:ClearPendingLootMail()
 	local canCollectMail
 	if private.mode == "all" then
 		local total
@@ -438,6 +469,7 @@ end
 
 function private:AutoLoot()
 	TSMAPI:CancelFrame("mailSkipDelay")
+	if private:IsPendingLootMail(private.lootIndex) then return end
 
 	-- Already looted everything after the invalid indexes we had, so fail it
 	if private.lootIndex > 1 and private.lootIndex > GetInboxNumItems() then
@@ -551,6 +583,7 @@ function private:LootMailItem(index)
 			TSM:Printf(L["Collected mail from %s with a subject of '%s'."], sender, subject)
 		end
 	end
+	private:SetPendingLootMail(index)
 	AutoLootMailItem(index)
 end
 
@@ -663,6 +696,7 @@ function private:StopAutoLooting(failed)
 	private.mode = nil
 	private.resetIndex = nil
 	private.autoLootTotal = nil
+	private:ClearPendingLootMail()
 	if not private.frame then return end
 	private.frame:EnableButtons()
 
@@ -697,8 +731,10 @@ end
 function Inbox:UI_ERROR_MESSAGE(event, msg)
 	if msg == ERR_MAIL_DATABASE_ERROR then
 		-- recover from internal mail error
+		private:ClearPendingLootMail()
 		TSMAPI:CreateTimeDelay("mailWaitDelay", 1, private.AutoLoot)
 	elseif msg == ERR_INV_FULL or msg == ERR_ITEM_MAX_COUNT then
+		private:ClearPendingLootMail()
 		-- Try the next index in case we can still loot more such as in the case of glyphs
 		private.lootIndex = private.lootIndex + 1
 
