@@ -24,6 +24,10 @@ private.boltConversions = {
 	["item:53643:0:0:0:0:0:0"] = { itemString = "item:53010:0:0:0:0:0:0", quantity = 5 }, -- Bolt of Embersilk
 	["item:82441:0:0:0:0:0:0"] = { itemString = "item:72988:0:0:0:0:0:0", quantity = 5 }, -- Bolt of Windwool Cloth
 }
+private.rawClothConversions = {}
+for boltItemString, data in pairs(private.boltConversions) do
+	private.rawClothConversions[data.itemString] = { itemString = boltItemString, quantity = data.quantity }
+end
 
 local function AddShoppingItem(items, itemString, quantity, conversion)
 	if not itemString or not quantity or quantity <= 0 then return end
@@ -40,6 +44,8 @@ local function AddShoppingItem(items, itemString, quantity, conversion)
 		sourceBolt = conversion.sourceBolt,
 		rawItemString = conversion.rawItemString,
 		rawPerBolt = conversion.rawPerBolt,
+		boltItemString = conversion.boltItemString,
+		clothPerBolt = conversion.clothPerBolt,
 	}
 	tinsert(items, item)
 	return item
@@ -49,10 +55,13 @@ local function BuildShoppingItems(items, ignoreMaxQty)
 	local shoppingItems = {}
 	for itemString, quantity in pairs(items) do
 		local boltConversion = private.boltConversions[itemString]
+		local rawClothConversion = private.rawClothConversions[itemString]
 		AddShoppingItem(shoppingItems, itemString, quantity, {
 			ignoreMaxQty = ignoreMaxQty,
 			rawItemString = boltConversion and boltConversion.itemString,
 			rawPerBolt = boltConversion and boltConversion.quantity,
+			boltItemString = rawClothConversion and rawClothConversion.itemString,
+			clothPerBolt = rawClothConversion and rawClothConversion.quantity,
 		})
 	end
 	return shoppingItems
@@ -72,6 +81,13 @@ local function GetSearchQuery(item)
 			rawQuery = rawQuery .. "/x" .. (item.quantity * item.rawPerBolt)
 		end
 		query = query .. "; " .. rawQuery
+	elseif item.boltItemString and item.clothPerBolt then
+		local boltName = TSMAPI:GetSafeItemInfo(item.boltItemString)
+		local boltQuery = boltName .. "/exact"
+		if not item.ignoreMaxQty then
+			boltQuery = boltQuery .. "/x" .. ceil(item.quantity / item.clothPerBolt)
+		end
+		query = query .. "; " .. boltQuery
 	end
 
 	return query
@@ -201,6 +217,15 @@ local function ShoppingCallback(remainingQty, boughtItem, stackSize)
 			quantityUpdates = {
 				[currentItem.itemString] = currentItem.quantity,
 				[currentItem.rawItemString] = currentItem.quantity * currentItem.rawPerBolt,
+			}
+		elseif currentItem and currentItem.boltItemString and currentItem.clothPerBolt and (boughtItem == currentItem.itemString or boughtItem == currentItem.boltItemString) then
+			if boughtItem == currentItem.boltItemString then
+				remainingQty = max((currentItem.quantity or 0) - (stackSize or 0) * currentItem.clothPerBolt, 0)
+			end
+			currentItem.quantity = max(remainingQty or 0, 0)
+			quantityUpdates = {
+				[currentItem.itemString] = currentItem.quantity,
+				[currentItem.boltItemString] = ceil(currentItem.quantity / currentItem.clothPerBolt),
 			}
 		end
 		TSM.Inventory.gatherQuantity = remainingQty

@@ -13,6 +13,17 @@ local L = LibStub("AceLocale-3.0"):GetLocale("TradeSkillMaster_Crafting") -- loa
 
 local MAX_QUEUE_STAGES = 10
 local inventoryTotals = {}
+local tailoringBolts = {
+	["item:2996:0:0:0:0:0:0"] = true, -- Bolt of Linen Cloth
+	["item:2997:0:0:0:0:0:0"] = true, -- Bolt of Woolen Cloth
+	["item:4305:0:0:0:0:0:0"] = true, -- Bolt of Silk Cloth
+	["item:4339:0:0:0:0:0:0"] = true, -- Bolt of Mageweave
+	["item:14048:0:0:0:0:0:0"] = true, -- Bolt of Runecloth
+	["item:21840:0:0:0:0:0:0"] = true, -- Bolt of Netherweave
+	["item:41510:0:0:0:0:0:0"] = true, -- Bolt of Frostweave
+	["item:53643:0:0:0:0:0:0"] = true, -- Bolt of Embersilk
+	["item:82441:0:0:0:0:0:0"] = true, -- Bolt of Windwool Cloth
+}
 
 
 local notified = {}
@@ -126,7 +137,7 @@ function Queue:GetIntermediateCrafts(mats, usedItems, usedMats, tempMats)
 				local mat = TSM.db.realm.mats[itemString]
 				local craftCost = TSM:GetCustomPrice("Crafting", itemString)
 				local lowestCost = TSM:GetCustomPrice(mat.customValue or TSM.db.global.defaultMatCostMethod, itemString)
-				if craftCost and lowestCost and craftCost <= lowestCost and (not TSM.db.global.neverCraftInks or not TSMAPI.InkConversions[itemString]) then
+				if tailoringBolts[itemString] or (craftCost and lowestCost and craftCost <= lowestCost and (not TSM.db.global.neverCraftInks or not TSMAPI.InkConversions[itemString])) then
 					local spellID = TSM.Cost:GetLowestCraftPrices(itemString, true)
 					if spellID and TSM.db.realm.crafts[spellID] then
 						local numResult = TSM.db.realm.crafts[spellID].numResult
