@@ -42,6 +42,18 @@ function private:ClearPendingLootMail()
 	private.pendingLootTotalMail = nil
 end
 
+function private:ShouldPrintLootMessage(index)
+	local key = private:GetMailKey(index)
+	local now = GetTime()
+	if private.lastLootMessageKey == key and private.lastLootMessageIndex == index and private.lastLootMessageTime and now - private.lastLootMessageTime < 2 then
+		return false
+	end
+	private.lastLootMessageKey = key
+	private.lastLootMessageIndex = index
+	private.lastLootMessageTime = now
+	return true
+end
+
 
 function Inbox:OnEnable()
 	Inbox:RegisterEvent("MAIL_SHOW")
@@ -279,6 +291,9 @@ end
 function private:InboxUpdate()
 	if not private.frame or not private.frame:IsVisible() then return end
 	TSMAPI:CancelFrame("inboxLootTextDelay")
+	private.lastLootMessageKey = nil
+	private.lastLootMessageIndex = nil
+	private.lastLootMessageTime = nil
 
 	local numMail, totalMail = GetInboxNumItems()
 
@@ -521,11 +536,11 @@ function private:AutoLoot()
 end
 
 function private:LootMailItem(index)
-	if TSM.db.global.inboxMessages then
+	if TSM.db.global.inboxMessages and private:ShouldPrintLootMessage(index) then
 		--local _, _, sender, subject, money, cod, _, hasItem = GetInboxHeaderInfo(index)
 		local _, _, sender, subject, money, cod, daysLeft, hasItem, _, _, _, _, _, itemQuantity = GetInboxHeaderInfo(index)
 		sender = sender or "?"
-		isTakeable = select(4, GetInboxText(index))
+		local isTakeable = select(4, GetInboxText(index))
 		if isTakeable then
 			-- it's an invoice
 			local invoiceType, itemName, playerName, bid, _, _, ahcut, _, _, _, quantity = GetInboxInvoiceInfo(index)
