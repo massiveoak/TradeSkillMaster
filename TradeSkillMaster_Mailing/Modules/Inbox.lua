@@ -56,6 +56,7 @@ function private:ClearLootMessageKey()
 	private.lastLootMessageNumMail = nil
 	private.lastLootMessageTotalMail = nil
 	private.lastLootMessageTime = nil
+	private.printedLootMessages = nil
 end
 
 function private:ShouldPrintLootMessage(index)
@@ -70,6 +71,16 @@ function private:ShouldPrintLootMessage(index)
 	private.lastLootMessageNumMail = numMail
 	private.lastLootMessageTotalMail = totalMail
 	private.lastLootMessageTime = now
+	return true
+end
+
+function private:ShouldPrintLootLine(key)
+	private.printedLootMessages = private.printedLootMessages or {}
+	local now = GetTime()
+	if private.printedLootMessages[key] and now - private.printedLootMessages[key] < 5 then
+		return false
+	end
+	private.printedLootMessages[key] = now
 	return true
 end
 
@@ -575,7 +586,10 @@ function private:LootMailItem(index)
 				local itemLink = GetInboxItemLink(index, 1) or itemName
 				TSM:Printf(L["Collected purchase of %s (%d) for %s."], itemLink, quantity or 1, TSMAPI:FormatTextMoney(bid, redColor))
 			elseif invoiceType == "seller" then
-				TSM:Printf(L["Collected sale of %s (%d) for %s."], itemName, quantity or 1, TSMAPI:FormatTextMoney(bid - ahcut, greenColor))
+				local saleKey = strjoin(":", "seller", tostring(itemName), tostring(quantity or 1), tostring(bid), tostring(ahcut))
+				if private:ShouldPrintLootLine(saleKey) then
+					TSM:Printf(L["Collected sale of %s (%d) for %s."], itemName, quantity or 1, TSMAPI:FormatTextMoney(bid - ahcut, greenColor))
+				end
 				-- TSM:Printf("Collected sale of %s for %s.", itemName, TSMAPI:FormatTextMoney(bid - ahcut, greenColor))
 			elseif invoiceType == "seller_temp_invoice" then
 				-- TSM:Printf("Removing pending sale: %s (%s)", itemName, TSMAPI:FormatTextMoney(bid - ahcut, yellowColor))
