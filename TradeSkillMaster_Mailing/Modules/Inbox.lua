@@ -13,10 +13,18 @@ local L = LibStub("AceLocale-3.0"):GetLocale("TradeSkillMaster_Mailing") -- load
 local private = { recheckTime = 1, allowTimerStart = true, lootIndex = 1, freeSlots = true }
 
 function private:GetMailKey(index)
-	local _, _, sender, subject, money, cod, daysLeft, hasItem = GetInboxHeaderInfo(index)
+	local _, _, sender, subject, money, cod, _, hasItem = GetInboxHeaderInfo(index)
+	local isInvoice = select(4, GetInboxText(index))
+	if isInvoice then
+		local invoiceType, itemName, playerName, bid, _, _, ahcut, _, _, _, quantity = GetInboxInvoiceInfo(index)
+		if not quantity then
+			quantity = select(3, GetInboxItem(index))
+		end
+		return strjoin(":", "invoice", tostring(sender), tostring(subject), tostring(invoiceType), tostring(itemName), tostring(playerName), tostring(bid), tostring(ahcut), tostring(quantity), tostring(money), tostring(cod))
+	end
 	local itemLink = GetInboxItemLink(index, 1)
 	local quantity = itemLink and select(3, GetInboxItem(index, 1)) or 0
-	return strjoin(":", tostring(sender), tostring(subject), tostring(money), tostring(cod), tostring(daysLeft), tostring(hasItem), tostring(itemLink), tostring(quantity))
+	return strjoin(":", tostring(sender), tostring(subject), tostring(money), tostring(cod), tostring(hasItem), tostring(itemLink), tostring(quantity))
 end
 
 function private:IsPendingLootMail(index)
@@ -54,7 +62,7 @@ function private:ShouldPrintLootMessage(index)
 	local key = private:GetMailKey(index)
 	local now = GetTime()
 	local numMail, totalMail = GetInboxNumItems()
-	if private.lastLootMessageKey == key and private.lastLootMessageIndex == index and private.lastLootMessageNumMail == numMail and private.lastLootMessageTotalMail == totalMail and private.lastLootMessageTime and now - private.lastLootMessageTime < 2 then
+	if private.lastLootMessageKey == key and private.lastLootMessageIndex == index and private.lastLootMessageNumMail == numMail and private.lastLootMessageTotalMail == totalMail and private.lastLootMessageTime and now - private.lastLootMessageTime < 5 then
 		return false
 	end
 	private.lastLootMessageKey = key
