@@ -42,14 +42,25 @@ function private:ClearPendingLootMail()
 	private.pendingLootTotalMail = nil
 end
 
+function private:ClearLootMessageKey()
+	private.lastLootMessageKey = nil
+	private.lastLootMessageIndex = nil
+	private.lastLootMessageNumMail = nil
+	private.lastLootMessageTotalMail = nil
+	private.lastLootMessageTime = nil
+end
+
 function private:ShouldPrintLootMessage(index)
 	local key = private:GetMailKey(index)
 	local now = GetTime()
-	if private.lastLootMessageKey == key and private.lastLootMessageIndex == index and private.lastLootMessageTime and now - private.lastLootMessageTime < 2 then
+	local numMail, totalMail = GetInboxNumItems()
+	if private.lastLootMessageKey == key and private.lastLootMessageIndex == index and private.lastLootMessageNumMail == numMail and private.lastLootMessageTotalMail == totalMail and private.lastLootMessageTime and now - private.lastLootMessageTime < 2 then
 		return false
 	end
 	private.lastLootMessageKey = key
 	private.lastLootMessageIndex = index
+	private.lastLootMessageNumMail = numMail
+	private.lastLootMessageTotalMail = totalMail
 	private.lastLootMessageTime = now
 	return true
 end
@@ -291,9 +302,6 @@ end
 function private:InboxUpdate()
 	if not private.frame or not private.frame:IsVisible() then return end
 	TSMAPI:CancelFrame("inboxLootTextDelay")
-	private.lastLootMessageKey = nil
-	private.lastLootMessageIndex = nil
-	private.lastLootMessageTime = nil
 
 	local numMail, totalMail = GetInboxNumItems()
 
@@ -456,6 +464,7 @@ end
 function private:StartAutoLooting(mode)
 	private.mode = mode
 	private:ClearPendingLootMail()
+	private:ClearLootMessageKey()
 	local canCollectMail
 	if private.mode == "all" then
 		local total
@@ -771,6 +780,7 @@ function Inbox:MAIL_CLOSED()
 	private.allowTimerStart = true
 	private.waitingForData = nil
 	private:StopAutoLooting()
+	private:ClearLootMessageKey()
 	TSMAPI:CancelFrame("inboxLootTextDelay")
 	TSMAPI:CancelFrame("mailSkipDelay")
 	Inbox:UnregisterEvent("UI_ERROR_MESSAGE") --sometimes shows error messages even when closed, so unregister that event.
