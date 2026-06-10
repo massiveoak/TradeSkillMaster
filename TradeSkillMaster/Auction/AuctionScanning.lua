@@ -280,7 +280,7 @@ function private:ScanAuctions()
 	if private.scanType ~= "lastPage" then
 		private.query.page = private.query.page + 1 -- increment current page
 		if totalPages > 0 then
-			DoCallback("SCAN_PAGE_UPDATE", private.query.page, totalPages)
+			DoCallback("SCAN_PAGE_UPDATE", private.query.page, min(totalPages, private.query.maxPages or totalPages))
 		end
 	end
 	PopulatePageTemp()
@@ -296,7 +296,7 @@ function private:ScanAuctions()
 
 	if private.scanType == "lastPage" then
 		return DoCallback("SCAN_LAST_PAGE_COMPLETE", private.data)
-	elseif private.query.page >= totalPages then
+	elseif private.query.page >= min(totalPages, private.query.maxPages or totalPages) then
 		-- we have finished scanning this query
 		private:StopScanning()
 		return DoCallback("SCAN_COMPLETE", private.data)

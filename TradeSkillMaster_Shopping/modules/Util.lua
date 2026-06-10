@@ -186,6 +186,7 @@ end
 
 function private:PrepareForScan(callback, isLastPageScan)
 	TSMAPI:CancelFrame("shoppingRestartSniper")
+	TSMAPI:CancelFrame("shoppingNextFilterDelay")
 	TSMAPI.AuctionScan:StopScan()
 	private.searchItem = nil
 	private.isLastPageScan = isLastPageScan
@@ -226,8 +227,12 @@ function private.ScanCallback(event, ...)
 		-- which is what this scanner uses nowadays.
 		private:ScanComplete(true)
 	elseif event == "SCAN_TIMEOUT" then
-		tremove(private.filterList, 1)
-		private:ScanNextFilter()
+		local completedFilter = tremove(private.filterList, 1)
+		if completedFilter and completedFilter.scanDelay then
+			TSMAPI:CreateTimeDelay("shoppingNextFilterDelay", completedFilter.scanDelay, private.ScanNextFilter)
+		else
+			private:ScanNextFilter()
+		end
 	elseif event == "SCAN_COMPLETE" then
 		if not private.filterList or not private.filterList[1] then return end -- protect against sniper scan starts causing issues
 		local data = ...
@@ -257,8 +262,12 @@ function private.ScanCallback(event, ...)
 		end
 		private:UpdateRT()
 		private.searchFrame.rt:ClearSelection()
-		tremove(private.filterList, 1)
-		private:ScanNextFilter()
+		local completedFilter = tremove(private.filterList, 1)
+		if completedFilter and completedFilter.scanDelay then
+			TSMAPI:CreateTimeDelay("shoppingNextFilterDelay", completedFilter.scanDelay, private.ScanNextFilter)
+		else
+			private:ScanNextFilter()
+		end
 	elseif event == "SCAN_LAST_PAGE_COMPLETE" then
 		local data = ...
 		for itemString, auctionData in pairs(data) do

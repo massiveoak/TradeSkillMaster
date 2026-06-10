@@ -3,6 +3,8 @@ local Destroying = TSM:NewModule("Destroying")
 local L = LibStub("AceLocale-3.0"):GetLocale("TradeSkillMaster_Shopping") -- loads the localization table
 
 local private = {sources={}}
+local MAX_DISENCHANT_SCAN_PAGES = 12
+local DISENCHANT_SCAN_DELAY = 0.5
 
 
 function Destroying:OnEnable()
@@ -186,11 +188,19 @@ end
 function private.StartDisenchantingSearch(target, filter, lastAttempt)
 	local disenchantData = TSMAPI:GetDisenchantData(target)
 	if not disenchantData then return end
+
+	if TSM.isCrafting then
+		local func = TSMAPI:ParseCustomPrice("matprice")
+		private.targetMarketValue = func and func(target) or nil
+	else
+		private.targetMarketValue = TSM:GetMaxPrice(TSM.db.global.marketValueSource, target)
+	end
 	
 	local queries = {}
 	local query = TSMAPI:GetAuctionQueryInfo(target)
 	if not query and not lastAttempt then return end
 	if query then
+		query.scanDelay = DISENCHANT_SCAN_DELAY
 		tinsert(queries, query)
 	end
 	for itemType, rarityData in pairs(disenchantData.itemTypes) do
@@ -201,10 +211,29 @@ function private.StartDisenchantingSearch(target, filter, lastAttempt)
 			class = 2
 		end
 		for rarity, data in pairs(rarityData) do
-			local minILevel = data[1].minItemLevel or 0
-			local maxILevel = data[#data].maxItemLevel or 0
-			local query = {name="", class=class, subClass=0, minLevel=disenchantData.minLevel, maxLevel=disenchantData.maxLevel, minILevel=minILevel, maxILevel=maxILevel, quality=rarity}
-			tinsert(queries, query)
+			local minILevel = max(data[1].minItemLevel or 0, TSM.db.global.minDeSearchLvl or 0)
+			local maxILevel = min(data[#data].maxItemLevel or 0, TSM.db.global.maxDeSearchLvl or math.huge)
+			if minILevel <= maxILevel then
+				local maxYield = 0
+				for _, rangeData in ipairs(data) do
+					maxYield = max(maxYield, rangeData.amountOfMats or 0)
+				end
+				local maxPrice = private.targetMarketValue and private.targetMarketValue * maxYield * (TSM.db.global.maxDeSearchPercent or 1)
+				local query = {
+					name = "",
+					class = class,
+					subClass = 0,
+					minLevel = disenchantData.minLevel,
+					maxLevel = disenchantData.maxLevel,
+					minILevel = minILevel,
+					maxILevel = maxILevel,
+					quality = rarity,
+					maxPrice = maxPrice,
+					maxPages = MAX_DISENCHANT_SCAN_PAGES,
+					scanDelay = DISENCHANT_SCAN_DELAY,
+				}
+				tinsert(queries, query)
+			end
 		end
 	end
 	
@@ -219,12 +248,8 @@ function private.StartDisenchantingSearch(target, filter, lastAttempt)
 	private.mode = "disenchant"
 	private.target = target
 	if TSM.isCrafting then
-		local func = TSMAPI:ParseCustomPrice("matprice")
-		local price = func and func(target) or nil
-		private.targetMarketValue = price
 		TSM.Util:ShowSearchFrame(true, L["% Max Price"])
 	else
-		private.targetMarketValue = TSM:GetMaxPrice(TSM.db.global.marketValueSource, target)
 		TSM.Util:ShowSearchFrame(true, L["% Target Value"])
 	end
 	TSM.Search:SetSearchBarDisabled(true)
@@ -235,7 +260,8 @@ end
 
 function private.ScanCallback(event, ...)
 	if event == "filter" then
-		return
+		local filter = ...
+		return filter.maxPrice
 	elseif event == "process" then
 		local itemString, auctionItem = ...
 		local rate, shouldEvenFilter
