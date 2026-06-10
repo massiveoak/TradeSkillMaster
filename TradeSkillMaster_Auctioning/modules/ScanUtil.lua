@@ -59,10 +59,10 @@ local function CallbackHandler(event, ...)
 	end
 end
 
-function Scan:StartItemScan(itemList)
+function Scan:StartItemScan(itemList, exactQueriesOnly)
 	wipe(Scan.auctionData)
 	wipe(Scan.skipped)
-	TSMAPI:GenerateQueries(itemList, CallbackHandler)
+	TSMAPI:GenerateQueries(itemList, CallbackHandler, { exactQueriesOnly = exactQueriesOnly })
 	TSM.Manage:UpdateStatus("query", 0, -1)
 end
 

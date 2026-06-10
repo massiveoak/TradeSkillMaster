@@ -252,6 +252,28 @@ local function GenerateQueriesThread(self)
 		if not tryAgain then break end
 		self:Sleep(0.1)
 	end
+
+	if private.exactQueriesOnly then
+		local queries = {}
+		local skippedItems = {}
+		for index, itemString in ipairs(private.itemList) do
+			local query = TSMAPI:GetAuctionQueryInfo(itemString)
+			if query then
+				query.items = { itemString }
+				tinsert(queries, query)
+			else
+				tinsert(skippedItems, itemString)
+			end
+			private.callback("QUERY_UPDATE", index, #private.itemList, skippedItems)
+			wipe(skippedItems)
+			self:Yield()
+		end
+		private.isScanning = true
+		private.queries = queries
+		private.combinedQueries = {}
+		private.totalQueries = 0
+		return
+	end
 	
 	local filters1, num1 = GenerateFilters()
 	local filters2, num2 = GenerateFilters(true)
@@ -294,10 +316,11 @@ local function GenerateQueriesThread(self)
 	private.totalQueries = #combinedQueries
 end
 
-function TSMAPI:GenerateQueries(itemList, callback)
+function TSMAPI:GenerateQueries(itemList, callback, options)
 	if private.thread then return end
 	private.itemList = itemList
 	private.callback = callback
+	private.exactQueriesOnly = options and options.exactQueriesOnly
 	
 	local function ThreadDone()
 		if private.thread then

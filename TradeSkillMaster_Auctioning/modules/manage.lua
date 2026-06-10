@@ -38,7 +38,8 @@ function Manage:StartScan(GUIRef, options)
 	GUI.statusBar:SetStatusText(L["Starting Scan..."])
 	GUI.statusBar:UpdateStatus(0, 0)
 	GUI.infoText:SetInfo(L["Running Scan..."])
-	TSM.Scan:StartItemScan(scanList)
+	-- Posting scans favor exact item queries to avoid broad prefilter probes overwhelming private-server AHs.
+	TSM.Scan:StartItemScan(scanList, mode == "Post")
 end
 
 function Manage:StartNoScanScan(GUIRef, scanList)
