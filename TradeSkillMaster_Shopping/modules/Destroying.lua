@@ -4,7 +4,9 @@ local L = LibStub("AceLocale-3.0"):GetLocale("TradeSkillMaster_Shopping") -- loa
 
 local private = {sources={}}
 local MAX_DISENCHANT_SCAN_PAGES = 12
+local MAX_ARMOR_DISENCHANT_SCAN_PAGES = 4
 local DISENCHANT_SCAN_DELAY = 0.5
+local MAX_DISENCHANT_ARMOR_SUBCLASS = 7
 
 
 function Destroying:OnEnable()
@@ -234,20 +236,24 @@ function private.StartDisenchantingSearch(target, filter, lastAttempt)
 					maxYield = max(maxYield, rangeData.amountOfMats or 0)
 				end
 				local maxPrice = private.targetMarketValue and private.targetMarketValue * maxYield * (TSM.db.global.maxDeSearchPercent or 1)
-				local query = {
-					name = "",
-					class = class,
-					subClass = 0,
-					minLevel = disenchantData.minLevel,
-					maxLevel = disenchantData.maxLevel,
-					minILevel = minILevel,
-					maxILevel = maxILevel,
-					quality = rarity,
-					maxPrice = maxPrice,
-					maxPages = MAX_DISENCHANT_SCAN_PAGES,
-					scanDelay = DISENCHANT_SCAN_DELAY,
-				}
-				tinsert(queries, query)
+				local subClasses = itemType == "Armor" and { GetAuctionItemSubClasses(class) } or {}
+				local numSubClasses = itemType == "Armor" and min(#subClasses, MAX_DISENCHANT_ARMOR_SUBCLASS) or 1
+				for subClass = 1, numSubClasses do
+					local query = {
+						name = "",
+						class = class,
+						subClass = itemType == "Armor" and subClass or 0,
+						minLevel = disenchantData.minLevel,
+						maxLevel = disenchantData.maxLevel,
+						minILevel = minILevel,
+						maxILevel = maxILevel,
+						quality = rarity,
+						maxPrice = maxPrice,
+						maxPages = itemType == "Armor" and MAX_ARMOR_DISENCHANT_SCAN_PAGES or MAX_DISENCHANT_SCAN_PAGES,
+						scanDelay = DISENCHANT_SCAN_DELAY,
+					}
+					tinsert(queries, query)
+				end
 			end
 		end
 	end
