@@ -28,6 +28,20 @@ private.rawClothConversions = {}
 for boltItemString, data in pairs(private.boltConversions) do
 	private.rawClothConversions[data.itemString] = { itemString = boltItemString, quantity = data.quantity }
 end
+private.essenceConversions = {}
+local essencePairs = {
+	{ greater = "item:10939:0:0:0:0:0:0", lesser = "item:10938:0:0:0:0:0:0" }, -- Magic
+	{ greater = "item:11082:0:0:0:0:0:0", lesser = "item:10998:0:0:0:0:0:0" }, -- Astral
+	{ greater = "item:11135:0:0:0:0:0:0", lesser = "item:11134:0:0:0:0:0:0" }, -- Mystic
+	{ greater = "item:11175:0:0:0:0:0:0", lesser = "item:11174:0:0:0:0:0:0" }, -- Nether
+	{ greater = "item:16203:0:0:0:0:0:0", lesser = "item:16202:0:0:0:0:0:0" }, -- Eternal
+	{ greater = "item:22446:0:0:0:0:0:0", lesser = "item:22447:0:0:0:0:0:0" }, -- Planar
+	{ greater = "item:34055:0:0:0:0:0:0", lesser = "item:34056:0:0:0:0:0:0" }, -- Cosmic
+}
+for _, pair in ipairs(essencePairs) do
+	private.essenceConversions[pair.lesser] = { itemString = pair.greater, yield = 3 }
+	private.essenceConversions[pair.greater] = { itemString = pair.lesser, yield = 1 / 3 }
+end
 
 local function AddShoppingItem(items, itemString, quantity, conversion)
 	if not itemString or not quantity or quantity <= 0 then return end
@@ -46,6 +60,8 @@ local function AddShoppingItem(items, itemString, quantity, conversion)
 		rawPerBolt = conversion.rawPerBolt,
 		boltItemString = conversion.boltItemString,
 		clothPerBolt = conversion.clothPerBolt,
+		alternateItemString = conversion.alternateItemString,
+		alternateYield = conversion.alternateYield,
 	}
 	tinsert(items, item)
 	return item
@@ -56,12 +72,15 @@ local function BuildShoppingItems(items, ignoreMaxQty)
 	for itemString, quantity in pairs(items) do
 		local boltConversion = private.boltConversions[itemString]
 		local rawClothConversion = private.rawClothConversions[itemString]
+		local essenceConversion = private.essenceConversions[itemString]
 		AddShoppingItem(shoppingItems, itemString, quantity, {
 			ignoreMaxQty = ignoreMaxQty,
 			rawItemString = boltConversion and boltConversion.itemString,
 			rawPerBolt = boltConversion and boltConversion.quantity,
 			boltItemString = rawClothConversion and rawClothConversion.itemString,
 			clothPerBolt = rawClothConversion and rawClothConversion.quantity,
+			alternateItemString = essenceConversion and essenceConversion.itemString,
+			alternateYield = essenceConversion and essenceConversion.yield,
 		})
 	end
 	return shoppingItems
@@ -88,6 +107,13 @@ local function GetSearchQuery(item)
 			boltQuery = boltQuery .. "/x" .. ceil(item.quantity / item.clothPerBolt)
 		end
 		query = query .. "; " .. boltQuery
+	elseif item.alternateItemString and item.alternateYield then
+		local alternateName = TSMAPI:GetSafeItemInfo(item.alternateItemString)
+		local alternateQuery = alternateName .. "/exact"
+		if not item.ignoreMaxQty then
+			alternateQuery = alternateQuery .. "/x" .. ceil(item.quantity / item.alternateYield)
+		end
+		query = query .. "; " .. alternateQuery
 	end
 
 	return query
@@ -227,6 +253,15 @@ local function ShoppingCallback(remainingQty, boughtItem, stackSize)
 				[currentItem.itemString] = currentItem.quantity,
 				[currentItem.boltItemString] = ceil(currentItem.quantity / currentItem.clothPerBolt),
 			}
+		elseif currentItem and currentItem.alternateItemString and currentItem.alternateYield and (boughtItem == currentItem.itemString or boughtItem == currentItem.alternateItemString) then
+			if boughtItem == currentItem.alternateItemString then
+				remainingQty = max((currentItem.quantity or 0) - (stackSize or 0) * currentItem.alternateYield, 0)
+			end
+			currentItem.quantity = max(remainingQty or 0, 0)
+			quantityUpdates = {
+				[currentItem.itemString] = ceil(currentItem.quantity),
+				[currentItem.alternateItemString] = ceil(currentItem.quantity / currentItem.alternateYield),
+			}
 		end
 		TSM.Inventory.gatherQuantity = remainingQty
 		if TSM.Inventory.gatherItem and boughtItem ~= TSM.Inventory.gatherItem then
@@ -297,6 +332,9 @@ function Gather:ShoppingSearch(itemString, need, ignoreMaxQty)
 				else
 					TSMAPI:ModuleAPI("Shopping", "runDestroySearch", TSMAPI:GetSafeItemInfo(itemString) .. "/x" .. need, ShoppingCallback)
 				end
+			elseif convertSource == "transform" and private.essenceConversions[itemString] then
+				TSM.Inventory.gatherItem = nil
+				TSMAPI:ModuleAPI("Shopping", "runSearch", GetSearchQuery(private.shoppingItems[1]), ShoppingCallback)
 			else
 				TSMAPI:ModuleAPI("Shopping", "runSearch", TSMAPI:GetSafeItemInfo(itemString) .. "/exact/x" .. need, ShoppingCallback)
 			end
