@@ -307,11 +307,13 @@ function Gather:ShoppingSearch(itemString, need, ignoreMaxQty)
 				TSMAPI:ModuleAPI("Shopping", "runDestroySearch", TSMAPI:GetSafeItemInfo(itemString) .. "/x" .. need, ShoppingCallback)
 			end
 		elseif TSMAPI:GetDisenchantData(itemString) then
-			TSM.Inventory.gatherItem = itemString
+			-- Crafting gathering should buy the requested enchanting material directly.
+			-- Expanding this into broad armor and weapon scans can overwhelm private-server AH queries.
+			TSM.Inventory.gatherItem = nil
 			if ignoreMaxQty then
-				TSMAPI:ModuleAPI("Shopping", "runDestroySearch", TSMAPI:GetSafeItemInfo(itemString) .. "/exact", ShoppingCallback)
+				TSMAPI:ModuleAPI("Shopping", "runSearch", TSMAPI:GetSafeItemInfo(itemString) .. "/exact", ShoppingCallback)
 			else
-				TSMAPI:ModuleAPI("Shopping", "runDestroySearch", TSMAPI:GetSafeItemInfo(itemString) .. "/exact/x" .. need, ShoppingCallback)
+				TSMAPI:ModuleAPI("Shopping", "runSearch", TSMAPI:GetSafeItemInfo(itemString) .. "/exact/x" .. need, ShoppingCallback)
 			end
 		elseif TSMAPI.Conversions[itemString] then
 			TSM.Inventory.gatherItem = itemString
