@@ -203,6 +203,21 @@ function private.StartDisenchantingSearch(target, filter, lastAttempt)
 		query.scanDelay = DISENCHANT_SCAN_DELAY
 		tinsert(queries, query)
 	end
+
+	-- Search exact convertible materials before broad armor / weapon scans.
+	-- This ensures lesser / greater essence alternatives are available even if a broad AH query is slow.
+	for itemString, data in pairs(TSMAPI.Conversions[target] or {}) do
+		local query = TSMAPI:GetAuctionQueryInfo(itemString)
+		if not query and not lastAttempt then return end
+		if query then
+			if Destroying.maxQuantity and Destroying.maxQuantity > 0 and data.rate and data.rate > 0 then
+				query.maxQuantity = ceil(Destroying.maxQuantity / data.rate)
+			end
+			query.scanDelay = DISENCHANT_SCAN_DELAY
+			tinsert(queries, query)
+		end
+	end
+
 	for itemType, rarityData in pairs(disenchantData.itemTypes) do
 		local class = 0
 		if itemType == "Weapon" then
@@ -234,14 +249,6 @@ function private.StartDisenchantingSearch(target, filter, lastAttempt)
 				}
 				tinsert(queries, query)
 			end
-		end
-	end
-	
-	for itemString, data in pairs(TSMAPI.Conversions[target] or {}) do
-		local query = TSMAPI:GetAuctionQueryInfo(itemString)
-		if not query and not lastAttempt then return end
-		if query then
-			tinsert(queries, query)
 		end
 	end
 	

@@ -523,10 +523,10 @@ local conversions = {
 		["item:11082:0:0:0:0:0:0"] = {rate=3, source="transform"},
 	},
 	["item:10939:0:0:0:0:0:0"] = { -- Greater Magic Essence
-		["item:10938:0:0:0:0:0:0"] = {rate=3, source="transform"},
+		["item:10938:0:0:0:0:0:0"] = {rate=1/3, source="transform"},
 	},
 	["item:10938:0:0:0:0:0:0"] = { -- Lesser Magic Essence
-		["item:10939:0:0:0:0:0:0"] = {rate=1/3, source="transform"},
+		["item:10939:0:0:0:0:0:0"] = {rate=3, source="transform"},
 	},
 	["item:52721:0:0:0:0:0:0"] = { -- Heavenly Shard
 		["item:52720:0:0:0:0:0:0"] = {rate=1/3, source="transform"},
