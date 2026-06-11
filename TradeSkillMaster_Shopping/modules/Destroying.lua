@@ -7,6 +7,8 @@ local MAX_DISENCHANT_SCAN_PAGES = 12
 local MAX_ARMOR_DISENCHANT_SCAN_PAGES = 4
 local DISENCHANT_SCAN_DELAY = 0.5
 local MAX_DISENCHANT_ARMOR_SUBCLASS = 7
+local MISC_ARMOR_SUBCLASS = 1
+local MISC_ARMOR_INV_TYPES = { 2, 11, 12, 14 } -- Neck, Finger, Trinket, Held In Off-hand
 
 
 function Destroying:OnEnable()
@@ -239,20 +241,24 @@ function private.StartDisenchantingSearch(target, filter, lastAttempt)
 				local subClasses = itemType == "Armor" and { GetAuctionItemSubClasses(class) } or {}
 				local numSubClasses = itemType == "Armor" and min(#subClasses, MAX_DISENCHANT_ARMOR_SUBCLASS) or 1
 				for subClass = 1, numSubClasses do
-					local query = {
-						name = "",
-						class = class,
-						subClass = itemType == "Armor" and subClass or 0,
-						minLevel = disenchantData.minLevel,
-						maxLevel = disenchantData.maxLevel,
-						minILevel = minILevel,
-						maxILevel = maxILevel,
-						quality = rarity,
-						maxPrice = maxPrice,
-						maxPages = itemType == "Armor" and MAX_ARMOR_DISENCHANT_SCAN_PAGES or MAX_DISENCHANT_SCAN_PAGES,
-						scanDelay = DISENCHANT_SCAN_DELAY,
-					}
-					tinsert(queries, query)
+					local invTypes = itemType == "Armor" and subClass == MISC_ARMOR_SUBCLASS and MISC_ARMOR_INV_TYPES or { 0 }
+					for _, invType in ipairs(invTypes) do
+						local query = {
+							name = "",
+							class = class,
+							subClass = itemType == "Armor" and subClass or 0,
+							invType = invType,
+							minLevel = disenchantData.minLevel,
+							maxLevel = disenchantData.maxLevel,
+							minILevel = minILevel,
+							maxILevel = maxILevel,
+							quality = rarity,
+							maxPrice = maxPrice,
+							maxPages = itemType == "Armor" and MAX_ARMOR_DISENCHANT_SCAN_PAGES or MAX_DISENCHANT_SCAN_PAGES,
+							scanDelay = DISENCHANT_SCAN_DELAY,
+						}
+						tinsert(queries, query)
+					end
 				end
 			end
 		end
