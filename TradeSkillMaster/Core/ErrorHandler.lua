@@ -15,8 +15,16 @@ local L = LibStub("AceLocale-3.0"):GetLocale("TradeSkillMaster")
 
 local origErrorHandler, ignoreErrors, isErrorFrameVisible, isAssert
 TSMERRORLOG = {}
+local MAX_ERROR_LOG_ENTRIES = 20
 local tsmStack = {}
 local stackNameLookup = {}
+
+local function AddErrorLogEntry(entry)
+	tinsert(TSMERRORLOG, entry)
+	if #TSMERRORLOG > MAX_ERROR_LOG_ENTRIES then
+		tremove(TSMERRORLOG, 1)
+	end
+end
 
 local addonSuites = {
 	{name="ArkInventory"},
@@ -258,7 +266,7 @@ function TSMAPI:Verify(cond, err)
 	
 	ignoreErrors = true
 	
-	tinsert(TSMERRORLOG, err)
+	AddErrorLogEntry(err)
 	if not isErrorFrameVisible then
 		TSM:Print(L["Looks like TradeSkillMaster has detected an error with your configuration. Please address this in order to ensure TSM remains functional."])
 		ShowError(err, true)
@@ -288,7 +296,7 @@ local function TSMErrorHandler(msg)
 	errorMessage = errorMessage..color.."Local Variables:|r\n"..(debuglocals(isAssert and 5 or 4) or "").."\n"
 	errorMessage = errorMessage..color.."TSM Event Log:|r\n"..GetEventLog().."\n"
 	errorMessage = errorMessage..color.."Addons:|r\n"..GetAddonList().."\n"
-	tinsert(TSMERRORLOG, errorMessage)
+	AddErrorLogEntry(errorMessage)
 	if not isErrorFrameVisible then
 		TSM:Print(L["Looks like TradeSkillMaster has encountered an error. Please help the author fix this error by following the instructions shown."])
 		ShowError(errorMessage)

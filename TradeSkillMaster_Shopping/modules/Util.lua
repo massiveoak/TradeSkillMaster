@@ -12,22 +12,30 @@ local L = LibStub("AceLocale-3.0"):GetLocale("TradeSkillMaster_Shopping") -- loa
 local private = {auctions={}}
 TSMAPI:RegisterForTracing(private, "TradeSkillMaster_Shopping_private")
 Util.shoppingLog = {}
+local MAX_SHOPPING_LOG_ENTRIES = 500
+
+local function AddShoppingLogEntry(entry)
+	tinsert(Util.shoppingLog, entry)
+	if #Util.shoppingLog > MAX_SHOPPING_LOG_ENTRIES then
+		tremove(Util.shoppingLog, 1)
+	end
+end
 
 
 local function ControlCallback(event, ...)
 	if event == "OnBuyout" then
 		local auction = ...
-		tinsert(Util.shoppingLog, {action="Buyout", link=auction.link, buyout=auction.buyout, count=auction.count})
+		AddShoppingLogEntry({action="Buyout", link=auction.link, buyout=auction.buyout, count=auction.count})
 		private:RemoveAuction(auction, event, TSMAPI:GetItemString(auction.link))
 	elseif event == "OnCancel" then
 		local auction = ...
-		tinsert(Util.shoppingLog, {action="Cancel", link=auction.link, buyout=auction.buyout, count=auction.count})
+		AddShoppingLogEntry({action="Cancel", link=auction.link, buyout=auction.buyout, count=auction.count})
 		private:RemoveAuction(auction, event, TSMAPI:GetItemString(auction.link))
 	elseif event == "OnPost" then
 		local postInfo = ...
 		local link = select(2, TSMAPI:GetSafeItemInfo(postInfo.itemString))
 		for i=1, postInfo.numAuctions do
-			tinsert(Util.shoppingLog, {auction="Post", link=link, buyout=postInfo.buyout, count=postInfo.stackSize})
+			AddShoppingLogEntry({action="Post", link=link, buyout=postInfo.buyout, count=postInfo.stackSize})
 		end
 		private:AddPostedAuction(postInfo)
 	end
